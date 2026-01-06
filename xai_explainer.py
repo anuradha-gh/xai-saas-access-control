@@ -419,11 +419,20 @@ class XAIExplainerFactory:
         
         # C3 Embedding Explainer
         if 'c3_sbert' in self.models and 'c3_if' in self.models:
+            # IMPROVEMENT #1: Add reference data for nearest neighbor search
+            ref_embeddings = background_data.get('c3_reference_embeddings') if background_data else None
+            ref_texts = background_data.get('c3_reference_texts') if background_data else None
+            
             self.explainers['c3_embedding'] = EmbeddingExplainer(
                 self.models['c3_sbert'],
-                self.models['c3_if']
+                self.models['c3_if'],
+                reference_embeddings=ref_embeddings,
+                reference_texts=ref_texts
             )
-            print("  ✓ C3 Embedding Explainer initialized")
+            if ref_embeddings is not None and ref_texts is not None:
+                print(f"  ✓ C3 Embedding Explainer initialized with {len(ref_texts)} reference samples")
+            else:
+                print("  ✓ C3 Embedding Explainer initialized (no reference data)")
         
         # C3 SHAP Explainer
         if 'c3_if' in self.models and SHAP_AVAILABLE:

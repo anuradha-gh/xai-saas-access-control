@@ -41,12 +41,33 @@ def load_system_with_xai():
         mse = np.mean((X_scaled - recon)**2, axis=1).reshape(-1, 1)
         c1_features_for_shap = np.hstack([latent, mse])  # This matches Isolation Forest input
         
+        # IMPROVEMENT #1: Prepare C3 reference embeddings for similar activities
+        print("📝 Preparing C3 reference embeddings...")
+        reference_texts = []
+        for record in records[:500]:  # Use 500 samples as reference
+            try:
+                text = log_to_text(record)
+                reference_texts.append(text)
+            except:
+                continue
+        
+        # Generate embeddings for reference texts
+        if reference_texts:
+            reference_embeddings = state['models']['c3_sbert'].encode(reference_texts, show_progress_bar=False)
+            print(f"✓ Generated {len(reference_texts)} reference embeddings for C3")
+        else:
+            reference_embeddings = None
+            reference_texts = None
+            print("⚠️ No reference data for C3 - similar activities won't be shown")
+        
         # Create explainer factory
         state['xai_explainer'] = XAIExplainerFactory(state['models'], state['preprocessors'])
         
-        # Prepare background data for SHAP
+        # Prepare background data for SHAP + reference data for C3
         background_data = {
             'c1_features': c1_features_for_shap,  # Latent + MSE features
+            'c3_reference_embeddings': reference_embeddings,  # NEW!
+            'c3_reference_texts': reference_texts  # NEW!
         }
         
         state['xai_explainer'].initialize(background_data)
@@ -265,13 +286,23 @@ def display_xai_details(xai_c1, xai_c2, xai_c3):
         print("\n🔍 C3 Similar Activities (Semantic Similarity):")
         for neighbor in xai_c3['embedding']['nearest_neighbors'][:2]:
             print(f"  - {neighbor['text'][:60]}... (similarity: {neighbor['similarity']:.2%})")
+    elif xai_c3.get('embedding'):
+        # Fallback: show what C3 data exists
+        print("\n🔍 C3 Embedding Analysis:")
+        emb_data = xai_c3['embedding']
+        if 'isolation_score' in emb_data:
+            print(f"  - Isolation Score: {emb_data['isolation_score']:.4f}")
+        if 'important_dimensions' in emb_data:
+            print(f"  - Top Important Dimensions:")
+            for dim in emb_data['important_dimensions'][:3]:
+                print(f"    • Dimension {dim['dimension']}: {dim['importance']:.4f}")
     
     # C3 SHAP (if available)
     if xai_c3.get('shap', {}).get('feature_importance'):
         print("\n📊 C3 Embedding Dimensions (SHAP - Top 3):")
         for feat in xai_c3['shap']['feature_importance'][:3]:
             dim = feat['feature'].replace('dim_', '')
-            print(f"  - Dimension {dim}: {feat['shap_value']:.4f}")")
+            print(f"  - Dimension {dim}: {feat['shap_value']:.4f}")
 
 
 def run_validation_suite():
