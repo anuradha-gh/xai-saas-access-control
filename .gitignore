@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Large Model Files (Git LFS recommended for these)
+*.h5
+*.joblib
+*.pkl
+*.pth
+*.ckpt
+*.safetensors
+
+# Large Data Files
+*.json
+!config*.json
+flaws_cloudtrail00.json
+
+# Model Directories (too large for regular git)
+trained_role_classifier*/
+c3_unsupervised_aws_model/
+autoencoder.h5
+isolation_forest.joblib
+
+# Validation Reports
+validation_report.json
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Test outputs
+test_output/
+temp/
