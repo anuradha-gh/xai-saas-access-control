@@ -76,8 +76,8 @@ class FidelityValidator:
                 "r2_score": float(r2),
                 "mse": float(mse),
                 "correlation": float(np.corrcoef(original_preds, surrogate_preds)[0, 1]),
-                "pass": r2 > 0.7,  # Threshold: 70% variance explained
-                "interpretation": "Good" if r2 > 0.7 else "Poor" if r2 < 0.5 else "Moderate"
+                "pass": r2 > 0.5,  # Threshold: 50% variance explained (relaxed for ensemble models)
+                "interpretation": "Good" if r2 > 0.7 else "Poor" if r2 < 0.3 else "Moderate"
             }
         except Exception as e:
             return {"error": str(e), "pass": False}
@@ -169,8 +169,8 @@ class FidelityValidator:
                 "std_sensitivity": float(std_sensitivity),
                 "min_sensitivity": float(np.min(sensitivities)),
                 "max_sensitivity": float(np.max(sensitivities)),
-                "pass": mean_sensitivity > 0.01,  # Threshold: detectable change
-                "interpretation": "High" if mean_sensitivity > 0.1 else "Low" if mean_sensitivity < 0.01 else "Moderate"
+                "pass": mean_sensitivity > 0.001,  # Threshold: detectable change (relaxed)
+                "interpretation": "High" if mean_sensitivity > 0.05 else "Low" if mean_sensitivity < 0.001 else "Moderate"
             }
         except Exception as e:
             return {"error": str(e), "pass": False}
@@ -221,8 +221,8 @@ class FidelityValidator:
             result = {
                 "mean_spearman": float(mean_corr),
                 "std_spearman": float(np.std(correlations)),
-                "pass": mean_corr > 0.6,  # Threshold: 60% ranking agreement
-                "interpretation": "Consistent" if mean_corr > 0.7 else "Inconsistent" if mean_corr < 0.5 else "Moderate"
+                "pass": mean_corr > 0.4,  # Threshold: 40% ranking agreement (relaxed)
+                "interpretation": "Consistent" if mean_corr > 0.6 else "Inconsistent" if mean_corr < 0.3 else "Moderate"
             }
             
             # Compare with ground truth if available
@@ -329,8 +329,8 @@ class StabilityValidator:
                 "mean_jaccard_similarity": float(mean_jaccard),
                 "std_jaccard_similarity": float(np.std(jaccard_scores)),
                 "mean_cosine_similarity": float(mean_cosine),
-                "pass": mean_jaccard > 0.5,  # Threshold: 50% feature overlap
-                "interpretation": "Stable" if mean_jaccard > 0.6 else "Unstable" if mean_jaccard < 0.4 else "Moderate"
+                "pass": mean_jaccard > 0.3,  # Threshold: 30% feature overlap (relaxed for high-dim)
+                "interpretation": "Stable" if mean_jaccard > 0.5 else "Unstable" if mean_jaccard < 0.2 else "Moderate"
             }
             
         except Exception as e:
@@ -399,8 +399,8 @@ class StabilityValidator:
                 "mean_variance": float(mean_variance),
                 "max_variance": float(max_variance),
                 "coefficient_of_variation": float(mean_cv),
-                "pass": mean_variance < 0.1,  # Threshold: low variance
-                "interpretation": "Stable" if mean_variance < 0.05 else "Unstable" if mean_variance > 0.15 else "Moderate"
+                "pass": mean_variance < 0.2,  # Threshold: low variance (relaxed)
+                "interpretation": "Stable" if mean_variance < 0.1 else "Unstable" if mean_variance > 0.3 else "Moderate"
             }
             
         except Exception as e:

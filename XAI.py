@@ -23,7 +23,7 @@ try:
     from xai_validator import XAIValidator
     XAI_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ XAI modules not fully available: {e}")
+    print(f"[WARNING] XAI modules not fully available: {e}")
     XAI_AVAILABLE = False
 
 # ==========================================
@@ -49,7 +49,7 @@ LOCAL_MODEL_NAME = "gemma3:1b"
 XAI_CONFIG = {
     'enable_xai': True,  # Set to False to disable XAI explanations
     'default_stakeholder': 'general',  # 'technical', 'executive', 'compliance', 'general'
-    'enable_validation': False,  # Set to True to enable validation metrics (slower)
+    'enable_validation': True,  # Set to True to enable validation metrics (slower)
     'num_shap_samples': 100,  # Number of samples for SHAP explanations
     'num_lime_samples': 1000,  # Number of samples for LIME explanations
 }
@@ -57,9 +57,9 @@ XAI_CONFIG = {
 if USE_LLM:
     try:
         import ollama
-        print("✓ Ollama imported successfully")
+        print("[OK] Ollama imported successfully")
     except ImportError:
-        print("⚠️ Ollama not available - LLM explanations disabled")
+        print("[WARNING] Ollama not available - LLM explanations disabled")
         USE_LLM = False
 
 # Suppress warnings
@@ -309,7 +309,7 @@ def display_c2_results(top_roles, explanation):
     print_component_header("COMPONENT 2: ROLE RECOMMENDATION")
 
     if not top_roles:
-        print("\n⚠️ No role predictions available")
+        print("\n[WARNING] No role predictions available")
         return
 
     medals = ["🥇", "🥈", "🥉"]
@@ -456,12 +456,12 @@ def chat_loop():
                 continue
 
             if user_input.lower() in ['quit', 'exit', 'q']:
-                print("\n✓ Exiting chatbot\n")
+                print("\n[OK] Exiting chatbot\n")
                 break
 
             if user_input.lower() == 'clear':
                 chat_history = []
-                print("\n✓ Chat history cleared\n")
+                print("\n[OK] Chat history cleared\n")
                 continue
 
             # Use the new on_chat_send method
@@ -471,10 +471,10 @@ def chat_loop():
             print(f"\n🤖 AI: {ai_response}")
 
         except KeyboardInterrupt:
-            print("\n\n✓ Exiting chatbot\n")
+            print("\n\n[OK] Exiting chatbot\n")
             break
         except EOFError:
-            print("\n\n✓ Exiting chatbot\n")
+            print("\n\n[OK] Exiting chatbot\n")
             break
 
 # ==========================================
@@ -542,7 +542,7 @@ def main():
 
             elif choice == '3':
                 if not current_log_context:
-                    print("\n⚠️ No analysis performed yet. Please analyze a log first.")
+                    print("\n[WARNING] No analysis performed yet. Please analyze a log first.")
                 else:
                     chat_loop()
 
@@ -566,3 +566,4 @@ def main():
 # ==========================================
 if __name__ == "__main__":
     main()
+
