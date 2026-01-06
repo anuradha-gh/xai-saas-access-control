@@ -381,7 +381,11 @@ class XAIExplainerFactory:
         
         # C1 SHAP Explainer
         if 'c1_if' in self.models and SHAP_AVAILABLE:
-            feature_names = ['eventName', 'eventSource', 'userIdentityType', 'awsRegion']
+            # Feature names for latent features + MSE
+            # C1's Isolation Forest uses latent space from autoencoder + MSE
+            latent_dim = background_data['c1_features'].shape[1] - 1  # -1 for MSE
+            feature_names = [f'latent_{i}' for i in range(latent_dim)] + ['mse']
+            
             self.explainers['c1_shap'] = SHAPExplainer(self.models['c1_if'], feature_names)
             if background_data and 'c1_features' in background_data:
                 self.explainers['c1_shap'].initialize(background_data['c1_features'])

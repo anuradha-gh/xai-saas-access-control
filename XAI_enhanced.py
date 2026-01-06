@@ -34,12 +34,19 @@ def load_system_with_xai():
         X_processed = state['preprocessors']['c1_prep'].transform(df).toarray()
         X_scaled = state['preprocessors']['c1_scaler'].transform(X_processed)
         
+        # IMPORTANT: For C1 SHAP, we need latent features + MSE (same as Isolation Forest input)
+        # NOT the raw one-hot encoded features
+        latent = state['models']['c1_enc'].predict(X_scaled, verbose=0)
+        recon = state['models']['c1_ae'].predict(X_scaled, verbose=0)
+        mse = np.mean((X_scaled - recon)**2, axis=1).reshape(-1, 1)
+        c1_features_for_shap = np.hstack([latent, mse])  # This matches Isolation Forest input
+        
         # Create explainer factory
         state['xai_explainer'] = XAIExplainerFactory(state['models'], state['preprocessors'])
         
         # Prepare background data for SHAP
         background_data = {
-            'c1_features': X_scaled,
+            'c1_features': c1_features_for_shap,  # Latent + MSE features
         }
         
         state['xai_explainer'].initialize(background_data)
@@ -73,13 +80,20 @@ def run_analysis_c1_with_xai(log_raw):
     xai_data = {}
     if 'xai_explainer' in state and state['xai_explainer'].initialized:
         try:
-            # Prepare data
+            # Prepare data - need to extract same features as Isolation Forest input
             p_log = parse_log_c1(log_raw)
             processed = state['preprocessors']['c1_prep'].transform(pd.DataFrame([p_log])).toarray()
             scaled = state['preprocessors']['c1_scaler'].transform(processed)
             
+            # Get latent features + MSE (same as Isolation Forest input)
+            latent = state['models']['c1_enc'].predict(scaled, verbose=0)
+            recon = state['models']['c1_ae'].predict(scaled, verbose=0)
+            mse = np.mean((scaled - recon)**2, axis=1).reshape(-1, 1)
+            features_for_if = np.hstack([latent, mse])
+            
             # Get XAI explanations
-            explanations = state['xai_explainer'].explain_c1(scaled, p_log)
+            # Pass features_for_if to SHAP (not scaled)
+            explanations = state['xai_explainer'].explain_c1(features_for_if, p_log)
             xai_data = explanations
             
         except Exception as e:
