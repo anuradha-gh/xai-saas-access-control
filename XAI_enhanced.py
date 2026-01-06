@@ -9,6 +9,9 @@ from xai_explainer import XAIExplainerFactory
 from llm_translator import LLMTranslator, StakeholderType  
 from xai_validator import XAIValidator
 from xai_performance import ExplanationCache  # IMPROVEMENT #2
+from xai_error_handling import setup_xai_logging, XAIErrorHandler  # IMPROVEMENT #3
+import logging
+import time
 
 # Override the load_system function to add XAI initialization
 original_load_system = load_system
@@ -22,8 +25,15 @@ def load_system_with_xai():
     if XAI_AVAILABLE and XAI_CONFIG.get('enable_xai', True):
         print("\n🔧 Initializing XAI Pipeline...")
         
+        # IMPROVEMENT #3: Setup logging and error handling
+        xai_logger = setup_xai_logging(log_file="xai.log", log_level=logging.INFO)
+        state['xai_logger'] = xai_logger
+        state['xai_error_handler'] = XAIErrorHandler(xai_logger)
+        xai_logger.info("XAI Pipeline initialization started")
+        
         # Get preprocessed data for SHAP background
         print("📂 Loading CloudTrail data for XAI background...")
+        xai_logger.info("Loading background data for XAI initialization")
         with open(CONFIG['log_data'], 'r') as f:
             log_data = json.load(f)
         records = log_data.get('Records', [])
@@ -118,22 +128,46 @@ def run_analysis_c1_with_xai(log_raw):
             features_for_if = np.hstack([latent, mse])
             
             # IMPROVEMENT #2: Check cache first
+            start_time = time.time()
             if 'xai_cache' in state:
-                cached = state['xai_cache'].get('c1', features_for_if)
-                if cached:
-                    xai_data = cached
-                else:
-                    # Compute and cache
+                try:
+                    cached = state['xai_cache'].get('c1', features_for_if)
+                    if cached:
+                        xai_data = cached
+                        duration = time.time() - start_time
+                        if 'xai_error_handler' in state:
+                            state['xai_error_handler'].log_performance('c1', duration, cached=True)
+                    else:
+                        # Compute and cache
+                        explanations = state['xai_explainer'].explain_c1(features_for_if, p_log)
+                        state['xai_cache'].set('c1', features_for_if, explanations)
+                        xai_data = explanations
+                        duration = time.time() - start_time
+                        if 'xai_error_handler' in state:
+                            state['xai_error_handler'].log_performance('c1', duration, cached=False)
+                except Exception as cache_error:
+                    # Cache failed, continue without it
+                    if 'xai_error_handler' in state:
+                        state['xai_error_handler'].handle_cache_error(cache_error, "get/set")
                     explanations = state['xai_explainer'].explain_c1(features_for_if, p_log)
-                    state['xai_cache'].set('c1', features_for_if, explanations)
                     xai_data = explanations
             else:
                 # No cache available
                 explanations = state['xai_explainer'].explain_c1(features_for_if, p_log)
                 xai_data = explanations
+                duration = time.time() - start_time
+                if 'xai_error_handler' in state:
+                    state['xai_error_handler'].log_performance('c1', duration)
             
         except Exception as e:
-            print(f"⚠️ XAI C1 error: {e}")
+            # IMPROVEMENT #3: Better error handling
+            if 'xai_error_handler' in state:
+                xai_data = state['xai_error_handler'].handle_explanation_error(
+                    'c1', e, context=f"Event: {log_raw.get('eventName', 'Unknown')}"
+                )
+            else:
+                print(f"⚠️ XAI C1 error: {e}")
+                xai_data = {}
     
     return risk_score, category, color, xai_data
 
