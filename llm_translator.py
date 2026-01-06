@@ -7,6 +7,7 @@ tailored for different stakeholder types (technical, executive, compliance)
 import json
 from typing import Dict, Any, List, Optional
 from enum import Enum
+from xai_templates import EnhancedTemplateGenerator  # IMPROVEMENT #4
 
 
 class StakeholderType(Enum):
@@ -25,6 +26,9 @@ class LLMTranslator:
         self.model_name = model_name
         self.ollama_available = False
         
+        # IMPROVEMENT #4: Initialize enhanced template generator
+        self.template_gen = EnhancedTemplateGenerator()
+        
         if self.use_ollama:
             try:
                 import ollama
@@ -32,7 +36,7 @@ class LLMTranslator:
                 self.ollama_available = True
                 print("✓ LLM Translator initialized with Ollama")
             except ImportError:
-                print("⚠️ Ollama not available - falling back to template-based explanations")
+                print("⚠️ Ollama not available - using enhanced template explanations")
                 self.ollama_available = False
     
     def _build_system_prompt(self, stakeholder: StakeholderType) -> str:
@@ -220,25 +224,40 @@ XAI Analysis:
         return context
     
     def _fallback_explanation(self, component: str, xai_data: Dict[str, Any]) -> str:
-        """Template-based fallback when LLM unavailable"""
+        """IMPROVEMENT #4: Enhanced template-based fallback"""
         
         if component == "C1":
             risk_score = xai_data.get('risk_score', 0)
             category = xai_data.get('category', 'UNKNOWN')
-            return (f"This activity has a {category} risk score of {risk_score}/100. "
-                   f"The anomaly detection system flagged unusual patterns in the log behavior.")
+            shap_data = xai_data.get('shap', {})
+            shap_values = shap_data.get('feature_importance', [])
+            log_context = xai_data.get('log_context', {})
+            
+            return self.template_gen.generate_c1_explanation(
+                risk_score, category, shap_values, log_context
+            )
         
         elif component == "C2":
             predicted_role = xai_data.get('predicted_role', 'Unknown')
             confidence = xai_data.get('confidence', 0)
-            return (f"The system predicts this should be assigned to role '{predicted_role}' "
-                   f"with {confidence:.0%} confidence based on the action patterns.")
+            lime_data = xai_data.get('lime', {})
+            lime_words = lime_data.get('word_importance', [])
+            log_context = xai_data.get('log_context', {})
+            log_text = log_context.get('text', '')
+            
+            return self.template_gen.generate_c2_explanation(
+                predicted_role, confidence, lime_words, log_text
+            )
         
         elif component == "C3":
             decision = xai_data.get('decision', 'UNKNOWN')
             confidence = xai_data.get('confidence', 0)
-            return (f"Access decision: {decision}. The system's confidence in this decision "
-                   f"is {confidence}/10 based on semantic similarity to known patterns.")
+            embedding_data = xai_data.get('embedding', {})
+            similar_activities = embedding_data.get('nearest_neighbors', [])
+            
+            return self.template_gen.generate_c3_explanation(
+                decision, confidence, similar_activities
+            )
         
         return f"[Component {component}] XAI data: {xai_data}"
     
