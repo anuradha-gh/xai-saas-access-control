@@ -260,11 +260,18 @@ def display_xai_details(xai_c1, xai_c2, xai_c3):
         for word in xai_c2['lime']['word_importance'][:5]:
             print(f"  - '{word['word']}': {word['importance']:.3f}")
     
-    # C3 XAI
+    # C3 XAI - ADDED!
     if xai_c3.get('embedding', {}).get('nearest_neighbors'):
-        print("\n🔍 C3 Similar Activities:")
+        print("\n🔍 C3 Similar Activities (Semantic Similarity):")
         for neighbor in xai_c3['embedding']['nearest_neighbors'][:2]:
-            print(f"  - {neighbor['text'][:50]}... (sim: {neighbor['similarity']:.2%})")
+            print(f"  - {neighbor['text'][:60]}... (similarity: {neighbor['similarity']:.2%})")
+    
+    # C3 SHAP (if available)
+    if xai_c3.get('shap', {}).get('feature_importance'):
+        print("\n📊 C3 Embedding Dimensions (SHAP - Top 3):")
+        for feat in xai_c3['shap']['feature_importance'][:3]:
+            dim = feat['feature'].replace('dim_', '')
+            print(f"  - Dimension {dim}: {feat['shap_value']:.4f}")")
 
 
 def run_validation_suite():
