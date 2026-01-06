@@ -1,5 +1,7 @@
 # SHAP/LIME vs No SHAP/LIME: What's the Difference?
 
+> **Note**: The examples below show **formatted/idealized output** to illustrate the type of information XAI provides. The actual `XAI_enhanced.py` currently shows simpler technical details. Use `xai_display.py` for the enhanced formatting shown in these examples.
+
 ## 🔍 Quick Comparison
 
 | Aspect | **Without SHAP/LIME** | **With SHAP/LIME** |
