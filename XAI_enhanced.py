@@ -8,6 +8,7 @@ from XAI import *
 from xai_explainer import XAIExplainerFactory
 from llm_translator import LLMTranslator, StakeholderType  
 from xai_validator import XAIValidator
+from xai_performance import ExplanationCache  # IMPROVEMENT #2
 
 # Override the load_system function to add XAI initialization
 original_load_system = load_system
@@ -83,6 +84,10 @@ def load_system_with_xai():
             state['xai_validator'] = XAIValidator()
             print("✓ XAI Validator initialized")
         
+        # IMPROVEMENT #2: Initialize explanation cache for performance
+        state['xai_cache'] = ExplanationCache(cache_dir=".xai_cache", max_size=500)
+        print("✓ XAI Cache initialized (500 explanations max)")
+        
         print("✅ XAI Pipeline Ready!")
     else:
         print("ℹ️ XAI Pipeline disabled")
@@ -112,10 +117,20 @@ def run_analysis_c1_with_xai(log_raw):
             mse = np.mean((scaled - recon)**2, axis=1).reshape(-1, 1)
             features_for_if = np.hstack([latent, mse])
             
-            # Get XAI explanations
-            # Pass features_for_if to SHAP (not scaled)
-            explanations = state['xai_explainer'].explain_c1(features_for_if, p_log)
-            xai_data = explanations
+            # IMPROVEMENT #2: Check cache first
+            if 'xai_cache' in state:
+                cached = state['xai_cache'].get('c1', features_for_if)
+                if cached:
+                    xai_data = cached
+                else:
+                    # Compute and cache
+                    explanations = state['xai_explainer'].explain_c1(features_for_if, p_log)
+                    state['xai_cache'].set('c1', features_for_if, explanations)
+                    xai_data = explanations
+            else:
+                # No cache available
+                explanations = state['xai_explainer'].explain_c1(features_for_if, p_log)
+                xai_data = explanations
             
         except Exception as e:
             print(f"⚠️ XAI C1 error: {e}")
