@@ -1,9 +1,9 @@
 """
 XAI Explainer Module
 Provides interpretability techniques for the three classification models:
-- C1: Autoencoder + Isolation Forest (Anomaly Detection)
-- C2: BERT (Role Classification)
-- C3: Sentence-BERT + Isolation Forest (Access Decision)
+- C1: Autoencoder + Isolation Forest (Anomaly Detection) - SHAP + Counterfactuals
+- C2: BERT (Role Classification) - Integrated Gradients (upgraded from LIME)
+- C3: Sentence-BERT + Isolation Forest (Access Decision) - Nearest Neighbors
 """
 
 import numpy as np
@@ -28,6 +28,21 @@ try:
 except ImportError:
     LIME_AVAILABLE = False
     print("⚠️ LIME not installed. Run: pip install lime")
+
+# UPGRADE: Import new explainers
+try:
+    from xai_integrated_gradients import IntegratedGradientsExplainer
+    IG_AVAILABLE = True
+except ImportError:
+    IG_AVAILABLE = False
+    print("⚠️ Integrated Gradients not available. Using LIME fallback.")
+
+try:
+    from xai_counterfactual import CounterfactualExplainer
+    CF_AVAILABLE = True
+except ImportError:
+    CF_AVAILABLE = False
+    print("⚠️ Counterfactual explainer not available.")
 
 
 class SHAPExplainer:
@@ -401,11 +416,36 @@ class XAIExplainerFactory:
             )
             print("  ✓ C1 Reconstruction Explainer initialized")
         
-        # C2 LIME Explainer
-        if 'c2_pipe' in self.models and LIME_AVAILABLE:
-            class_names = ['LABEL_0', 'LABEL_1', 'LABEL_2']  # Update with actual labels
+        # UPGRADE: C1 Counterfactual Explainer
+        if 'c1_if' in self.models and CF_AVAILABLE:
+            if background_data and 'c1_features' in background_data:
+                latent_dim = background_data['c1_features'].shape[1] - 1
+                feature_names_cf = [f'latent_{i}' for i in range(latent_dim)] + ['mse']
+                self.explainers['c1_counterfactual'] = CounterfactualExplainer(
+                    self.models['c1_if'],
+                    background_data['c1_features'],
+                    feature_names_cf
+                )
+                print("  ✓ C1 Counterfactual Explainer initialized")
+        
+        # UPGRADE: C2 Integrated Gradients Explainer (replaces LIME)
+        if 'c2_pipe' in self.models and IG_AVAILABLE:
+            try:
+                tokenizer = self.models['c2_pipe'].tokenizer
+                model = self.models['c2_pipe'].model
+                self.explainers['c2_ig'] = IntegratedGradientsExplainer(model, tokenizer)
+                print("  ✓ C2 Integrated Gradients Explainer initialized")
+            except Exception as e:
+                print(f"  ⚠️ C2 Integrated Gradients failed: {e}. Falling back to LIME.")
+                if LIME_AVAILABLE:
+                    class_names = ['LABEL_0', 'LABEL_1', 'LABEL_2']
+                    self.explainers['c2_lime'] = LIMETextExplainer(self.models['c2_pipe'], class_names)
+                    print("  ✓ C2 LIME Explainer initialized (fallback)")
+        elif 'c2_pipe' in self.models and LIME_AVAILABLE:
+            # Fallback to LIME if IG not available
+            class_names = ['LABEL_0', 'LABEL_1', 'LABEL_2']
             self.explainers['c2_lime'] = LIMETextExplainer(self.models['c2_pipe'], class_names)
-            print("  ✓ C2 LIME Explainer initialized")
+            print("  ✓ C2 LIME Explainer initialized (IG not available)")
         
         # C2 Attention Explainer
         if 'c2_pipe' in self.models:
@@ -449,7 +489,7 @@ class XAIExplainerFactory:
         return self.explainers.get(name)
     
     def explain_c1(self, scaled_instance: np.ndarray, original_features: Dict[str, Any]) -> Dict[str, Any]:
-        """Get comprehensive C1 explanation"""
+        """Get comprehensive C1 explanation (UPGRADED: added counterfactuals)"""
         explanations = {}
         
         if 'c1_shap' in self.explainers:
@@ -466,18 +506,45 @@ class XAIExplainerFactory:
             except Exception as e:
                 explanations['reconstruction'] = {"error": str(e)}
         
+        # UPGRADE: Add counterfactual explanation
+        if 'c1_counterfactual' in self.explainers:
+            try:
+                explanations['counterfactual'] = self.explainers['c1_counterfactual'].find_counterfactual(
+                    scaled_instance.flatten()
+                )
+            except Exception as e:
+                explanations['counterfactual'] = {"error": str(e)}
+        
         return explanations
     
     def explain_c2(self, text: str) -> Dict[str, Any]:
-        """Get comprehensive C2 explanation"""
+        """Get comprehensive C2 explanation (UPGRADED: Integrated Gradients replaces LIME)"""
         explanations = {}
         
-        if 'c2_lime' in self.explainers:
+        # UPGRADE: Prioritize Integrated Gradients over LIME
+        if 'c2_ig' in self.explainers:
+            try:
+                explanations['integrated_gradients'] = self.explainers['c2_ig'].explain(text)
+                # Mark as primary method
+                explanations['primary_method'] = 'Integrated Gradients'
+            except Exception as e:
+                explanations['integrated_gradients'] = {"error": str(e)}
+                # Fall back to LIME if IG fails
+                if 'c2_lime' in self.explainers:
+                    try:
+                        explanations['lime'] = self.explainers['c2_lime'].explain(text, num_features=8)
+                        explanations['primary_method'] = 'LIME (fallback)'
+                    except Exception as e2:
+                        explanations['lime'] = {"error": str(e2)}
+        elif 'c2_lime' in self.explainers:
+            # Use LIME if IG not available
             try:
                 explanations['lime'] = self.explainers['c2_lime'].explain(text, num_features=8)
+                explanations['primary_method'] = 'LIME'
             except Exception as e:
                 explanations['lime'] = {"error": str(e)}
         
+        # Still include attention if available
         if 'c2_attention' in self.explainers:
             try:
                 explanations['attention'] = self.explainers['c2_attention'].explain(text)

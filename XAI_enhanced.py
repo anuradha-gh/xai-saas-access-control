@@ -324,11 +324,29 @@ def display_xai_details(xai_c1, xai_c2, xai_c3):
         for feat in xai_c1['reconstruction']['feature_errors'][:3]:
             print(f"  - {feat['feature']}: {feat['error']:.3f}")
     
-    # C2 XAI
-    if xai_c2.get('lime', {}).get('word_importance'):
+    # UPGRADE: Display counterfactual explanation
+    if xai_c1.get('counterfactual', {}).get('is_anomaly'):
+        cf = xai_c1['counterfactual']
+        print("\n💡 C1 Counterfactual (How to make normal):")
+        if cf.get('top_feature_changes'):
+            for change in cf['top_feature_changes'][:2]:  # Top 2 changes
+                print(f"  - {change['feature']}: {change['change_needed']}")
+            print(f"  Distance to normal: {cf.get('distance_to_normal', 0):.3f}")
+    
+    # C2 XAI - UPGRADED: Integrated Gradients
+    if xai_c2.get('integrated_gradients', {}).get('token_attributions'):
+        print("\n⚡ C2 Token Attributions (Integrated Gradients):")
+        for token in xai_c2['integrated_gradients']['token_attributions'][:5]:
+            print(f"  - '{token['token']}': {token['attribution']:.3f}")
+        method = xai_c2.get('primary_method', 'Unknown')
+        print(f"  [Method: {method}]")
+    elif xai_c2.get('lime', {}).get('word_importance'):
+        # Fallback to LIME if IG not available
         print("\n📝 C2 Important Words (LIME):")
         for word in xai_c2['lime']['word_importance'][:5]:
             print(f"  - '{word['word']}': {word['importance']:.3f}")
+        method = xai_c2.get('primary_method', 'LIME')
+        print(f"  [Method: {method}]")
     
     # C3 XAI - ADDED!
     if xai_c3.get('embedding', {}).get('nearest_neighbors'):
